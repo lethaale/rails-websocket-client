@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,9 +16,16 @@ const (
 	defaultTimeout = 5 * time.Second
 )
 
+type Store interface {
+	io.Closer
+	SaveBinanceData(ctx context.Context, arguments json.RawMessage) error
+}
+
 type SQLiteStore struct {
 	db *sql.DB
 }
+
+var _ Store = (*SQLiteStore)(nil)
 
 func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	db, err := sql.Open("sqlite", path)
@@ -28,7 +36,9 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	// SQLite does not benefit from many concurrent writers; keep it simple.
 	db.SetMaxOpenConns(1)
 
-	return &SQLiteStore{db: db}, nil
+	return &SQLiteStore{
+		db: db,
+	}, nil
 }
 
 func (s *SQLiteStore) Close() error {
@@ -66,25 +76,34 @@ func (s *SQLiteStore) SaveBinanceData(ctx context.Context, arguments json.RawMes
 		return err
 	}
 
-	result, err := tx.ExecContext(ctx, `
+	var jobRowID int64
+	if err := tx.QueryRowContext(ctx, `
 INSERT INTO solid_queue_jobs (
-	queue_name, class_name, arguments, priority, active_job_id, scheduled_at,
-	finished_at, concurrency_key, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
-`, "default", "InsertPriceJob", string(argumentsPayload), 0, jobID, startTime, startTime, startTime)
-	if err != nil {
+	queue_name, class_name, arguments, priority, active_job_id, scheduled_at, finished_at, concurrency_key,
+    created_at, updated_at
+) VALUES (
+    @queueName, @className, @arguments, @priority, @jobID, @currentDateTime, NULL, NULL,
+    @currentDateTime, @currentDateTime
+)
+RETURNING id`,
+		sql.Named("queueName", "default"),
+		sql.Named("className", "InsertPriceJob"),
+		sql.Named("arguments", string(argumentsPayload)),
+		sql.Named("priority", 0),
+		sql.Named("jobID", jobID),
+		sql.Named("currentDateTime", startTime),
+	).Scan(&jobRowID); err != nil {
 		return err
-	}
-
-	jobRowID, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("unable to fetch job id: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO solid_queue_ready_executions (job_id, queue_name, priority, created_at)
-VALUES (?, ?, ?, ?)
-`, jobRowID, "prices", 0, startTime); err != nil {
+VALUES (@jobRowID, @queueName, @priority, @currentDateTime)`,
+		sql.Named("jobRowID", jobRowID),
+		sql.Named("queueName", "default"),
+		sql.Named("priority", 0),
+		sql.Named("currentDateTime", startTime),
+	); err != nil {
 		return err
 	}
 
