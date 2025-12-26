@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect websocket: %v", err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "shutdown")
+	defer conn.Close(websocket.StatusGoingAway, "shutdown")
 
 	log.Printf("connected to %s; writing jobs into %s", wsURL, dbPath)
 
