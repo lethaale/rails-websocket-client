@@ -1,4 +1,39 @@
-<div>
-  <h1 class="font-bold text-4xl">Prices#index</h1>
-  <p>Find me in app/views/prices/index.html.erb</p>
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-sm text-gray-500 uppercase tracking-wide">Live prices</p>
+      <h1 class="text-3xl font-bold text-gray-900">Prices</h1>
+    </div>
+  </div>
+
+  <%= turbo_stream_from "prices" %>
+
+  <div
+    class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+    data-controller="auto-scroll"
+  >
+    <div
+      class="overflow-y-auto max-h-[70vh]"
+      data-auto-scroll-target="viewport"
+    >
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Symbol</th>
+            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Price in USD</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Binance time</th>
+            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">DB created at</th>
+            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Displayed at</th>
+          </tr>
+        </thead>
+        <tbody
+          id="prices-list"
+          class="divide-y divide-gray-100"
+          data-auto-scroll-target="content"
+        >
+          <%= render @prices %>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
