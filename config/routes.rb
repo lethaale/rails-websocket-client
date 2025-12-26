@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  resources :prices, only: [ :index ]
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
   mount MissionControl::Jobs::Engine, at: "/jobs"
 
@@ -11,5 +12,5 @@ Rails.application.routes.draw do
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   # Defines the root path route ("/")
-  # root "posts#index"
+  root "prices#index"
 end
