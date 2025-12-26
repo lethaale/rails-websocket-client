@@ -35,7 +35,7 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
-func (s *SQLiteStore) SaveCodexData(ctx context.Context, arguments json.RawMessage) error {
+func (s *SQLiteStore) SaveBinanceData(ctx context.Context, arguments json.RawMessage) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
@@ -48,7 +48,7 @@ func (s *SQLiteStore) SaveCodexData(ctx context.Context, arguments json.RawMessa
 	startTime := time.Now().UTC()
 	jobID := uuid.New().String()
 
-	argumentsPayload, err := json.Marshal(codexInsert{
+	argumentsPayload, err := json.Marshal(binanceMessage{
 		JobClass:            "InsertPriceJob",
 		JobId:               jobID,
 		ProviderJobId:       nil,
@@ -71,7 +71,7 @@ INSERT INTO solid_queue_jobs (
 	queue_name, class_name, arguments, priority, active_job_id, scheduled_at,
 	finished_at, concurrency_key, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
-`, "prices", "Codex::Subscriptions::ProcessPriceUpdateJob", string(argumentsPayload), 0, jobID, startTime, startTime, startTime)
+`, "default", "InsertPriceJob", string(argumentsPayload), 0, jobID, startTime, startTime, startTime)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ VALUES (?, ?, ?, ?)
 	return nil
 }
 
-type codexInsert struct {
+type binanceMessage struct {
 	JobClass            string            `json:"job_class"`
 	JobId               string            `json:"job_id"`
 	ProviderJobId       any               `json:"provider_job_id"`

@@ -61,7 +61,7 @@ func main() {
 
 		log.Printf("received message: %s", string(raw))
 
-		if err := st.SaveCodexData(context.Background(), raw); err != nil {
+		if err := st.SaveBinanceData(context.Background(), raw); err != nil {
 			log.Printf("store error: %v", err)
 		}
 	}
