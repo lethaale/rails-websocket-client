@@ -19,7 +19,7 @@ Live-updating price board powered by Hotwire/Turbo Streams.
 
 The Go helper under `script/go-websockets` connects to Binance trades (`btcusdt@trade`) and writes two records per message into `solid_queue_jobs` and `solid_queue_ready_executions` tables in a local SQLite file.
 
-Requirements: Go 1.21+ (or current Go toolchain) and network access to `wss://stream.binance.com`.
+Requirements: Go 1.25+ (or current Go toolchain) and network access to `wss://stream.binance.com`.
 
 Setup & run:
 
