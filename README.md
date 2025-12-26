@@ -1,24 +1,26 @@
-# README
+# Rails Websocket Client
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Live-updating price board powered by Hotwire/Turbo Streams.
 
-Things you may want to cover:
+## Features
 
-* Ruby version
+- Streams prices to a table; newest rows auto-scroll into view.
+- Broadcasts on create/destroy; renders via `_price` partial.
+- Client-side metrics: ingest latency (created_at - binance_time) and display latency (now - binance_time).
 
-* System dependencies
+## Setup
 
-* Configuration
+1. Install deps: `bundle install`
+2. Install foreman: `brew install foreman`
+3. Set up DB: `bin/rails db:setup`
+4. Run app: `bin/dev`
 
-* Database creation
+## Usage
 
-* Database initialization
+- Visit `/` to see the prices table.
+- New prices appear live at the bottom; averages update automatically.
 
-* How to run the test suite
+## Notes
 
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+- Stimulus controller `auto_scroll` handles auto-scroll and latency averages.
+- Data attributes on rows carry binance/created epoch ms for precise calculations.

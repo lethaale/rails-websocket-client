@@ -1,21 +1,20 @@
-<tr id="<%= dom_id(price) %>" class="bg-white">
+<tr
+  id="<%= dom_id(price) %>"
+  class="even:bg-gray-50"
+  data-binance-time="<%= (price.binance_time.to_r * 1000).to_i %>"
+  data-created-at="<%= (price.created_at.to_r * 1000).to_i %>"
+>
   <td class="px-4 py-3 font-mono text-sm font-semibold text-gray-900"><%= price.symbol %></td>
   <td class="px-4 py-3 text-right font-mono text-sm text-gray-900">
     <%= number_to_currency(price.price, precision: 2) %>
   </td>
   <td class="px-4 py-3 text-sm text-gray-700">
-    <%= price.binance_time&.strftime("%Y-%m-%d %H:%M:%S.%L") %>
+    <%= price.binance_time&.strftime("%H:%M:%S.%L") %>
   </td>
-  <td class="px-4 py-3 text-right text-gray-700">
-    <%= price.created_at&.strftime("%Y-%m-%d %H:%M:%S.%L") %>
+  <td class="px-4 py-3 text-sm text-gray-700">
+    <%= price.created_at&.strftime("%H:%M:%S.%L") %>
     <p class="text-xs text-gray-500">
-      Latency in ms <%= ((price.created_at - price.binance_time) * 1000).round(3) %>
-    </p>
-  </td>
-  <td class="px-4 py-3 text-right text-gray-700">
-    <%= Time.current.strftime("%Y-%m-%d %H:%M:%S.%L") %>
-    <p class="text-xs text-gray-500">
-      Latency in ms <%= ((Time.current - price.binance_time) * 1000).round(3) %>
+      Latency <b><%= ((price.created_at - price.binance_time) * 1000).round(3) %></b> ms
     </p>
   </td>
 </tr>
