@@ -6,10 +6,9 @@
 # before the Go writer hits it.
 set -e
 
-# Create the database if needed, then load the primary schema plus the
-# Solid Queue / Cable / Cache schemas into the same Postgres database.
+# Standard Rails multi-database prepare — creates / loads schema for primary,
+# queue, cable, and cache against their respective DATABASE_URL secrets.
 ./bin/rails db:prepare
-./bin/rails db:load_solid_schemas
 
 # In a subshell, wait until Rails is accepting requests, then exec the
 # listener. With Postgres there's no longer a write-lock contention issue, but

@@ -27,9 +27,18 @@ func main() {
 		wsURL = _defaultURL
 	}
 
-	st, err := openStore()
+	// The listener writes Active Job rows for InsertPriceJob into Solid Queue's
+	// tables, which live in Rails' "queue" database. Point QUEUE_DATABASE_URL
+	// at that database (in dev: rails_websocket_client_development_queue; in
+	// prod: the per-region queue Postgres URL provisioned for Fly).
+	queueDB := os.Getenv("QUEUE_DATABASE_URL")
+	if queueDB == "" {
+		log.Fatalf("Environment variable QUEUE_DATABASE_URL not set")
+	}
+
+	st, err := store.NewPGStore(queueDB)
 	if err != nil {
-		log.Fatalf("failed to open store: %v", err)
+		log.Fatalf("failed to open postgres store: %v", err)
 	}
 	defer st.Close()
 
@@ -68,22 +77,4 @@ func main() {
 			log.Printf("store error: %v", err)
 		}
 	}
-}
-
-// Picks the store implementation based on which env var is set:
-//   - DATABASE_URL  → Postgres (production / Fly)
-//   - DB_PATH       → SQLite   (development / Procfile.dev)
-//
-// DATABASE_URL wins if both are set.
-func openStore() (store.Store, error) {
-	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
-		log.Printf("DATABASE_URL set, using Postgres store")
-		return store.NewPGStore(dsn)
-	}
-	if path := os.Getenv("DB_PATH"); path != "" {
-		log.Printf("DB_PATH=%s, using SQLite store", path)
-		return store.NewSQLiteStore(path)
-	}
-	log.Fatalf("either DATABASE_URL or DB_PATH must be set")
-	return nil, nil
 }

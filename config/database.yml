@@ -1,40 +1,52 @@
-# SQLite. Versions 3.8.0 and up are supported.
-#   gem install sqlite3
-#
-#   Ensure the SQLite 3 gem is defined in your Gemfile
-#   gem "sqlite3"
-#
+# Postgres everywhere. Rails' multi-database support gives us four logical
+# databases (primary, cache, queue, cable) that can either be four databases
+# on the same host (dev/test) or be wired to different DATABASE_URLs in prod.
 default: &default
-  adapter: sqlite3
-  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  timeout: 5000
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
 development:
   primary:
     <<: *default
-    database: storage/development.sqlite3
+    database: rails_websocket_client_development
+  cache:
+    <<: *default
+    database: rails_websocket_client_development_cache
+    migrations_paths: db/cache_migrate
   queue:
     <<: *default
-    database: storage/development_queue.sqlite3
+    database: rails_websocket_client_development_queue
     migrations_paths: db/queue_migrate
   cable:
     <<: *default
-    database: storage/development_cable.sqlite3
+    database: rails_websocket_client_development_cable
     migrations_paths: db/cable_migrate
 
-# Warning: The database defined as "test" will be erased and
-# re-generated from your development database when you run "rake".
-# Do not set this db to the same as development or production.
+# Warning: The database defined as "test" will be erased and re-generated from
+# your development database when you run "rake". Do not set this db to the same
+# as development or production.
 test:
   <<: *default
-  database: storage/test.sqlite3
+  database: rails_websocket_client_test
 
-# Production uses Postgres (Supabase via Fly's Managed Postgres add-on).
-# Single database with prices + Solid Queue/Cable/Cache tables sharing the
-# public schema. Removes the SQLite single-writer contention that was capping
-# throughput on a 1-vCPU box.
+# Production wires each Rails database to its own URL. Fly's Supabase add-on
+# only injects DATABASE_URL; provision QUEUE_DATABASE_URL / CABLE_DATABASE_URL /
+# CACHE_DATABASE_URL as additional secrets pointing at separate databases on
+# the same Postgres server (see DEPLOY.md).
 production:
-  adapter: postgresql
-  encoding: unicode
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  url: <%= ENV["DATABASE_URL"] %>
+  primary:
+    <<: *default
+    url: <%= ENV["DATABASE_URL"] %>
+  cache:
+    <<: *default
+    url: <%= ENV["CACHE_DATABASE_URL"] %>
+    migrations_paths: db/cache_migrate
+  queue:
+    <<: *default
+    url: <%= ENV["QUEUE_DATABASE_URL"] %>
+    migrations_paths: db/queue_migrate
+  cable:
+    <<: *default
+    url: <%= ENV["CABLE_DATABASE_URL"] %>
+    migrations_paths: db/cable_migrate

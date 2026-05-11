@@ -50,10 +50,8 @@ Rails.application.configure do
   config.cache_store = :solid_cache_store
 
   # Replace the default in-process and non-durable queuing backend for Active Job.
-  # Solid Queue shares the primary Postgres connection — single database, all
-  # Solid* tables in the public schema. Drop `connects_to` because there is no
-  # separate `queue` database in production anymore.
   config.active_job.queue_adapter = :solid_queue
+  config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Toy demo — no sensitive data in the queue. Skip Mission Control's HTTP basic
   # auth so /jobs is reachable on the conference URL without credentials.

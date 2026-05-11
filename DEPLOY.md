@@ -174,13 +174,39 @@ fly apps create rwc-tyo
 # Provision Supabase-managed Postgres in the same region. This injects
 # DATABASE_URL into the app's secrets automatically.
 fly ext supabase create --app rwc-tyo --region nrt
+```
 
-# Rails secret for credential decryption.
-fly secrets set RAILS_MASTER_KEY=$(cat config/master.key) --app rwc-tyo
+Supabase gives one Postgres server with a single default database. Rails' multi-database setup wants four (primary, queue, cable, cache), so create the other three and wire up their URLs as Fly secrets. From a local shell where the connection string is convenient:
+
+```bash
+# Open a psql against the new server (use the connection string Supabase shows
+# you in its dashboard, or pull DATABASE_URL out of the Fly secrets UI).
+PG_URL="postgres://postgres.<ref>:<pw>@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+
+psql "$PG_URL" <<'SQL'
+  CREATE DATABASE rwc_queue;
+  CREATE DATABASE rwc_cable;
+  CREATE DATABASE rwc_cache;
+SQL
+
+# Derive the three additional URLs by swapping the database name and feed them
+# to Fly as secrets. The Go listener also reads QUEUE_DATABASE_URL.
+queue_url=$(echo "$PG_URL"  | sed 's|/postgres$|/rwc_queue|')
+cable_url=$(echo "$PG_URL"  | sed 's|/postgres$|/rwc_cable|')
+cache_url=$(echo "$PG_URL"  | sed 's|/postgres$|/rwc_cache|')
+
+fly secrets set \
+  RAILS_MASTER_KEY=$(cat config/master.key) \
+  QUEUE_DATABASE_URL="$queue_url" \
+  CABLE_DATABASE_URL="$cable_url" \
+  CACHE_DATABASE_URL="$cache_url" \
+  --app rwc-tyo
 
 # Build remotely (no local cross-compile) and deploy.
 fly deploy --app rwc-tyo --remote-only
 ```
+
+`bin/fly-start` runs `bin/rails db:prepare` at boot, which loads each schema into its respective database — standard Rails 8 multi-database behavior, nothing custom.
 
 Open `https://rwc-tyo.fly.dev/`. Badge should read **region: tyo**.
 
@@ -190,12 +216,16 @@ In the Fly dashboard for the app, **Settings → GitHub** → connect your repo.
 
 ## Adding more regions on Fly
 
-Each region is its own app + its own Postgres on Fly:
+Each region is its own app + its own Supabase Postgres. Repeat the `psql` + four-URL secret dance per region:
 
 ```bash
 fly apps create rwc-fra
 fly ext supabase create --app rwc-fra --region fra
-fly secrets set RAILS_MASTER_KEY=$(cat config/master.key) REGION=fra --app rwc-fra
+# Create rwc_queue, rwc_cable, rwc_cache databases via psql against the new
+# Postgres server, then set the four secrets as above:
+fly secrets set RAILS_MASTER_KEY=... QUEUE_DATABASE_URL=... \
+                CABLE_DATABASE_URL=... CACHE_DATABASE_URL=... \
+                REGION=fra --app rwc-fra
 fly deploy --app rwc-fra --config fly.toml --remote-only
 ```
 
