@@ -50,5 +50,6 @@
 /.dockerignore
 /Dockerfile*
 
-# Go listener — built and shipped as its own image.
-/script
+# Go listener build artifacts (the source is kept — the unified Dockerfile builds it).
+/script/go-websockets/.gocache
+/script/go-websockets/Dockerfile

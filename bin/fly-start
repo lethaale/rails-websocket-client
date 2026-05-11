@@ -1,0 +1,14 @@
+#!/bin/bash
+# Fly.io launcher: runs Rails and the Go listener in one Machine so they can
+# share the SQLite files in /rails/storage.
+set -e
+
+# Prepare the database the same way the standard docker-entrypoint would.
+./bin/rails db:prepare
+
+# Start the Go listener in the background. It writes Active Job rows into the
+# Solid Queue tables that Rails reads.
+/usr/local/bin/listener &
+
+# Rails in the foreground — its exit drives the Machine's lifecycle.
+exec ./bin/thrust ./bin/rails server

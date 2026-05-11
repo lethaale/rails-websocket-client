@@ -1,0 +1,44 @@
+# Fly.io config for the Rails + Go listener combo. One Machine per region;
+# both processes run on the same Machine so they share /rails/storage.
+#
+# Per-region apps are the right pattern for the geo-latency demo: create one
+# app per region (rwc-tyo, rwc-fra, ...) so each has its own hostname and the
+# audience can hit specific regions explicitly. Change `app` and `primary_region`
+# per region (or just pass `--app` and `--region` flags on `fly launch`).
+
+app = "rails-websocket-client"
+primary_region = "nrt"
+
+[build]
+dockerfile = "Dockerfile"
+
+[env]
+RAILS_ENV            = "production"
+RAILS_LOG_TO_STDOUT  = "1"
+RAILS_SERVE_STATIC_FILES = "1"
+SOLID_QUEUE_IN_PUMA  = "true"
+REGION               = "tyo"
+DB_PATH              = "/rails/storage/production_queue.sqlite3"
+WS_URL               = "wss://stream.binance.com:9443/ws/btcusdt@trade"
+
+[[mounts]]
+source      = "rwc_storage"
+destination = "/rails/storage"
+initial_size = "1gb"
+
+[http_service]
+internal_port       = 80
+force_https         = true
+auto_stop_machines  = "off"   # keep the listener connection alive
+auto_start_machines = true
+min_machines_running = 1
+processes            = ["app"]
+
+[processes]
+app = "/rails/bin/fly-start"
+
+[[vm]]
+size       = "shared-cpu-1x"
+memory     = "256mb"
+cpu_kind   = "shared"
+cpus       = 1

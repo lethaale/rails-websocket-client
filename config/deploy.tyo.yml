@@ -1,0 +1,18 @@
+# Tokyo destination. Kamal merges this on top of config/deploy.yml when invoked as:
+#   bin/kamal deploy -d tyo
+
+servers:
+  web:
+    - <VULTR_IP>          # the Vultr Tokyo (nrt) droplet's public IP
+
+proxy:
+  ssl: false
+  host: <VULTR_IP_DASHED>.sslip.io   # e.g. 198-51-100-42.sslip.io — no DNS needed
+
+env:
+  clear:
+    REGION: tyo           # shown in the badge at the top of the page
+
+accessories:
+  listener:
+    host: <VULTR_IP>      # same box; the Go listener shares the SQLite volume
