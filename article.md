@@ -153,6 +153,8 @@ To make sure I wasn't just hand-waving, I ran the same Binance feed through thre
 
 Ballpark numbers from my setup: `wscat` is essentially at the network floor (a couple of ms), JS-direct lands in the low tens of ms, Go + Rails comes in around 150–200ms end-to-end.
 
+One bonus measurement falls out for free. Binance's WS payload carries _two_ timestamps: `T` (trade time — when the match actually happened in the matching engine) and `E` (event time — when Binance assembled and sent the WS frame). The gap between them is Binance's own internal delay, completely independent of your pipeline. On the live demo I'm running while writing this, that gap averages under 1 ms and never exceeds 2 ms. **Binance is essentially free.** Whatever latency you're paying is yours.
+
 So yes — going through Rails is slower than a JS-direct subscription. That's the honest tradeoff. What you get in return is that all your business logic, persistence, idempotency, and UI live in Rails — where they belong — and you're not writing trading logic in JavaScript on top of a raw socket.
 
 For most products, the bar you're trying to clear isn't "absolute fastest"; it's "fast enough that the user can't tell." 200ms feels live. 30ms feels live. The user really can't tell.
@@ -161,7 +163,9 @@ For most products, the bar you're trying to clear isn't "absolute fastest"; it's
 
 All three sources subtract Binance's `E` field from the same client clock at render time, so any NTP skew cancels in the _relative_ comparison between sources. Absolute numbers are approximate; the gaps between architectures are what's reliable.
 
-For each source I track p50, p95, p99, standard deviation, and jitter (mean absolute change between consecutive samples), plus drop rate from gaps in the Binance trade ID sequence. p95 and p99 tell you more about real-time UX than the mean does — a user who sees one trade at 150ms and the next at 1500ms experiences the system as broken even if the average is fine.
+One honest quirk worth flagging: latency is measured as `observed_at − E`, where `observed_at` is the _client's_ clock. If your laptop is a few ms ahead of Binance's NTP-synced server, the fastest messages show up with _negative_ latency — they appear to arrive before they were sent. On my dashboard the p1 sits around −20 ms most of the time. That's not a bug; it's two clocks disagreeing by 20 ms. The relative gaps between sources are still reliable (both read the same client clock), but the absolute floor is shifted by the skew. Worth knowing if you stare at p1 on the dashboard long enough to be confused by it.
+
+For each source I track p1, p50, p95, p99, standard deviation, and jitter (mean absolute change between consecutive samples), plus drop rate from gaps in the Binance trade ID sequence. p95 and p99 tell you more about real-time UX than the mean does — a user who sees one trade at 150ms and the next at 1500ms experiences the system as broken even if the average is fine.
 
 If you want to reproduce or extend this, the [demo repo](https://github.com/lethaale/rails-websocket-latency-demo) has the three-source comparison live, with stats panels per source and the measurement code.
 
@@ -239,13 +243,25 @@ For a single-region app — users and providers all in roughly the same part of 
 
 For a global app, the latency budget splits into three legs: Binance → Go listener, Go → DB → Rails, and Rails → the user's browser. The third leg is usually the biggest, because the Hotwire broadcast travels over the persistent ActionCable WebSocket between your Rails server and the user's tab. The round-trip on that socket is what the user actually feels.
 
-I haven't shipped this multi-region, but the shape of the answer seems clear enough:
+For the conference talk I shipped one region and watched this play out live. A single Fly.io box in Tokyo (`nrt`), because Binance's spot WebSocket lives in AWS Tokyo and the Go listener ends up essentially next door to their matching engine. Then I opened the page from a browser in Europe. Two numbers told the whole story:
+
+- **JS Direct** (browser → Binance, no Rails): mean latency ~70 ms.
+- **Rails path** (Tokyo Go listener → Tokyo Solid Queue → Tokyo Active Job → Hotwire broadcast back to Europe): mean latency ~480 ms.
+
+Look at what each path actually pays:
+
+- JS Direct makes _one_ trip: Tokyo → my browser, roughly 50 ms one-way.
+- The Rails path makes the same trip _twice_. The Go listener pulls each trade from Binance (free — both are in Tokyo). Then Rails broadcasts the result back to my browser in Europe — same ocean, long way around. Add the Solid Queue polling interval and the worker step on top.
+
+So putting Rails _next to Binance_ turns out to be the wrong half of the optimization. The upstream leg is already free; what's expensive is the **last mile to the user**. Move Rails to Frankfurt and that 480 ms collapses toward 150 ms — because now Rails is near the user while the Go listener still pulls upstream fast. (WebSocket streaming is one-way; the listener's location only affects _its_ ping to Binance, not the broadcast leg.)
+
+The original conclusion still holds — I just have a dashboard behind it now:
 
 - **Go listener: near the emitter.** WebSocket data is one-way streaming, so a listener near users would just give every regional copy the same upstream latency penalty. One listener near the source feeds everyone.
 - **Rails: near users.** The user-perceived latency is dominated by the round-trip on the ActionCable socket; regional Rails deployments help here.
 - **The layer between them is its own design problem.** Multiple Rails regions reading from the same queue means cross-region DB replication and its consistency tradeoffs. A distributed message broker (Kafka, NATS, Redis with replication) is cleaner but adds operational weight. Or you accept that distant users eat a higher last-mile latency and call it a day.
 
-If you're solving this for real, your scale will tell you which is right. I'm not pretending to have shipped it.
+I've shipped the geo-comparison part. The cross-region queue replication is the piece I still haven't proven, so take that last bullet as design intuition, not lived experience.
 
 ---
 
