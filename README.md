@@ -1,25 +1,32 @@
 # Rails Websocket Client
 
-Live-updating price board powered by Hotwire/Turbo Streams.
+Live-updating price board powered by Hotwire/Turbo Streams. Postgres everywhere, Rails 8 multi-database.
 
 ## Features
 
-- Streams prices to a table; newest rows auto-scroll into view.
-- Broadcasts on create/destroy; renders via `_price` partial.
-- Client-side metrics: ingest latency (created_at - binance_time) and display latency (now - binance_time).
+- Streams prices to a table; newest rows appear at the top.
+- Broadcasts on create; renders via `_price` partial.
+- Client-side metrics: latency percentiles, throughput, jitter, drop rate, Binance E−T gap.
+- Side-by-side comparison: JS Direct vs Rails (Go → Solid Queue → Active Job → Turbo Stream).
 
 ## Setup
 
-1. Install deps: `bundle install`
-2. Install foreman: `brew install foreman`
-3. Set up DB: `bin/rails db:setup`
-4. Run app: `bin/dev`
+You need Postgres running locally (Postgres.app, Homebrew, Docker — any of them).
 
-## Go websocket consumer (Binance -> SQLite)
+```bash
+bundle install
+brew install foreman                # if you don't already have it
+bin/rails db:prepare                # creates four dev databases + test
+bin/dev                             # web + css + jobs + Go listener
+```
 
-The Go helper under `script/go-websockets` connects to Binance trades (`btcusdt@trade`) and writes two records per message into `solid_queue_jobs` and `solid_queue_ready_executions` tables in a local SQLite file.
+`bin/rails db:prepare` creates four databases (primary, queue, cable, cache) on your local Postgres — same names you see in `config/database.yml`. The Go listener writes to the `queue` database; Rails workers read from it.
 
-Requirements: Go 1.25+ (or current Go toolchain) and network access to `wss://stream.binance.com`.
+## Go websocket consumer (Binance -> Postgres)
+
+The Go helper under `script/go-websockets` connects to Binance trades (`btcusdt@trade`) and writes two records per message into `solid_queue_jobs` and `solid_queue_ready_executions` in Rails' queue database.
+
+Requirements: Go 1.25+ and network access to `wss://stream.binance.com`.
 
 `bin/dev` already starts the listener alongside Rails (see `Procfile.dev`). First time only, fetch Go modules:
 
@@ -27,28 +34,19 @@ Requirements: Go 1.25+ (or current Go toolchain) and network access to `wss://st
 (cd script/go-websockets && go mod tidy)
 ```
 
-To run it standalone (from the project root):
+To run standalone (from the project root):
 
 ```bash
-(cd script/go-websockets && DB_PATH=../../storage/development_queue.sqlite3 go run .)
+(cd script/go-websockets && \
+  QUEUE_DATABASE_URL=postgres://localhost/rails_websocket_client_development_queue \
+  go run .)
 ```
 
-`DB_PATH` is required — it must point at the Solid Queue SQLite file that Rails reads.
-The path differs by Rails environment (see `config/database.yml`):
+Env vars:
 
-- development: `storage/development_queue.sqlite3`
-- production:  `storage/production_queue.sqlite3`
+- `QUEUE_DATABASE_URL` (required) — Postgres URL for the Solid Queue database.
+- `WS_URL` (optional) — override the WebSocket stream URL. Default: `wss://stream.binance.com:9443/ws/btcusdt@trade`.
 
-Optional env vars:
+## Deploying
 
-- `WS_URL` – override the websocket stream URL (default: `wss://stream.binance.com:9443/ws/btcusdt@trade`)
-
-## Usage
-
-- Visit `/` to see the prices table.
-- New prices appear live at the bottom; averages update automatically.
-
-## Notes
-
-- Stimulus controller `auto_scroll` handles auto-scroll and latency averages.
-- Data attributes on rows carry binance/created epoch ms for precise calculations.
+See [DEPLOY.md](DEPLOY.md) for Fly.io (push-to-deploy from GitHub, recommended) and Kamal (one-VM-per-region, no domain required) flows.
