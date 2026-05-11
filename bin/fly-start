@@ -29,4 +29,6 @@ set -e
 ) &
 
 # Rails in the foreground — its lifecycle drives the Machine.
-exec ./bin/thrust ./bin/rails server
+# Bind to 0.0.0.0 explicitly so Fly's proxy can reach us; Thruster was
+# producing "instance refused connection" on Fly, so we skip it on this path.
+exec ./bin/rails server -b 0.0.0.0 -p "${HTTP_PORT:-8080}"
