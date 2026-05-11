@@ -29,21 +29,12 @@ test:
   <<: *default
   database: storage/test.sqlite3
 
-# Store production database in the storage/ directory, which by default
-# is mounted as a persistent Docker volume in config/deploy.yml.
+# Production uses Postgres (Supabase via Fly's Managed Postgres add-on).
+# Single database with prices + Solid Queue/Cable/Cache tables sharing the
+# public schema. Removes the SQLite single-writer contention that was capping
+# throughput on a 1-vCPU box.
 production:
-  primary:
-    <<: *default
-    database: storage/production.sqlite3
-  cache:
-    <<: *default
-    database: storage/production_cache.sqlite3
-    migrations_paths: db/cache_migrate
-  queue:
-    <<: *default
-    database: storage/production_queue.sqlite3
-    migrations_paths: db/queue_migrate
-  cable:
-    <<: *default
-    database: storage/production_cable.sqlite3
-    migrations_paths: db/cable_migrate
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  url: <%= ENV["DATABASE_URL"] %>

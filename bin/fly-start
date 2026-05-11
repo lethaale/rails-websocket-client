@@ -1,21 +1,21 @@
 #!/bin/bash
-# Fly.io launcher: runs Rails and the Go listener on a single Machine so they
-# can share /rails/storage. Rails boots first; the listener only starts once
-# the /up health endpoint is responding, so the Go process doesn't contend
-# with Rails for the SQLite write lock during boot.
+# Fly.io launcher: runs Rails and the Go listener on a single Machine. Both
+# processes write to the same Postgres database (DATABASE_URL is injected by
+# Fly's Supabase add-on). Rails boots first; the listener only starts once the
+# /up health endpoint is responding, mostly so a clean DB has tables ready
+# before the Go writer hits it.
 set -e
 
-# Prepare the database the same way the standard docker-entrypoint would.
+# Create the database if needed, then load the primary schema plus the
+# Solid Queue / Cable / Cache schemas into the same Postgres database.
 ./bin/rails db:prepare
+./bin/rails db:load_solid_schemas
 
 # In a subshell, wait until Rails is accepting requests, then exec the
-# listener. The subshell runs in parallel with the Rails server below.
-# - If Rails comes up, the listener starts and runs until it (or the Machine)
-#   dies. Rails stays in the foreground, so listener failures don't bring the
-#   Machine down.
-# - If Rails never becomes healthy within the timeout, we log and give up on
-#   the listener; Rails itself will crash on its own error and Fly will
-#   restart the Machine.
+# listener. With Postgres there's no longer a write-lock contention issue, but
+# we keep the gate so the listener never starts before the schema is in place.
+# Rails stays in the foreground; if it crashes Fly restarts the Machine.
+# If the listener dies, Rails keeps running — restart it via `fly machine restart`.
 (
   health_url="http://127.0.0.1:${HTTP_PORT:-8080}/up"
   for attempt in $(seq 1 60); do
@@ -29,6 +29,6 @@ set -e
 ) &
 
 # Rails in the foreground — its lifecycle drives the Machine.
-# Bind to 0.0.0.0 explicitly so Fly's proxy can reach us; Thruster was
-# producing "instance refused connection" on Fly, so we skip it on this path.
+# Bind to 0.0.0.0 explicitly so Fly's proxy can reach us; skip Thruster on
+# this path (Fly's edge already does HTTPS termination and HTTP/2).
 exec ./bin/rails server -b 0.0.0.0 -p "${HTTP_PORT:-8080}"

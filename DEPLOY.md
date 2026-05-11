@@ -150,13 +150,14 @@ Repeat for any region. Each box is fully independent (its own SQLite, its own Bi
 
 # Alternative: Fly.io (push-to-deploy from GitHub)
 
-If you'd rather skip the manual Vultr provisioning and Docker Hub build/push, Fly.io can build from your GitHub repo on every push. Same architecture (Rails + Go listener on one Machine, sharing a SQLite volume), totally different deploy story.
+If you'd rather skip the manual Vultr provisioning and Docker Hub build/push, Fly.io can build from your GitHub repo on every push. Same end-to-end architecture (Rails + Go listener on one Machine, both talking to the same database), totally different deploy story.
 
 ## How it's structured
 
-- **One unified Docker image** built by `Dockerfile`. It already includes a `golang:1.25-alpine` build stage that produces the listener binary and copies it to `/usr/local/bin/listener`. The same image is used for Fly; Kamal still uses its separate listener image.
-- **One Machine per app**, running `bin/fly-start` — a tiny script that runs `db:prepare`, kicks the listener into the background, and execs Rails in the foreground. Both processes share `/rails/storage` (the mounted volume), so SQLite Just Works.
-- **One Fly app per region** (`rwc-tyo`, `rwc-fra`, `rwc-nyc`). Each gets its own hostname and its own volume, which is the right shape for the latency demo — same as the Kamal destinations.
+- **One unified Docker image** built by `Dockerfile`. A `golang:1.25-alpine` build stage produces the listener binary and copies it to `/usr/local/bin/listener` in the final image; same image runs Rails.
+- **One Machine per app**, running `bin/fly-start` — a tiny script that prepares the database, loads the Solid Queue / Cable / Cache schemas, then runs Rails in the foreground and the Go listener in the background once Rails is healthy.
+- **Postgres instead of SQLite.** Production uses a Fly Managed Postgres (Supabase) instance per app. `DATABASE_URL` is auto-injected as a Fly secret; both Rails and the Go listener read it. No volume mounts, no SQLite contention.
+- **One Fly app per region** (`rwc-tyo`, `rwc-fra`, `rwc-nyc`). Each gets its own hostname and its own Postgres database, fully independent — what you want for a geo-latency demo.
 
 ## First-time setup
 
@@ -165,35 +166,36 @@ brew install flyctl
 fly auth login
 ```
 
-Create the Tokyo app from the existing `fly.toml`:
+Create the Tokyo app and provision its database:
 
 ```bash
 fly apps create rwc-tyo
-fly volumes create rwc_storage --app rwc-tyo --region nrt --size 1
+
+# Provision Supabase-managed Postgres in the same region. This injects
+# DATABASE_URL into the app's secrets automatically.
+fly ext supabase create --app rwc-tyo --region nrt
+
+# Rails secret for credential decryption.
 fly secrets set RAILS_MASTER_KEY=$(cat config/master.key) --app rwc-tyo
+
+# Build remotely (no local cross-compile) and deploy.
 fly deploy --app rwc-tyo --remote-only
 ```
-
-`--remote-only` means Fly builds the image on their builders — no local cross-compile pain from your Mac.
 
 Open `https://rwc-tyo.fly.dev/`. Badge should read **region: tyo**.
 
 ## Push-to-deploy from GitHub
 
-In the Fly dashboard for the app, **Settings → GitHub** → connect your repo. From then on, every push to `main` triggers a remote build and deploy. That's the screen you were looking at.
-
-When Fly Launch asks for an internal port, you can ignore it — the committed `fly.toml` sets `internal_port = 80` to match Thruster, and the launch flow reads from `fly.toml` once it's in the repo.
+In the Fly dashboard for the app, **Settings → GitHub** → connect your repo. From then on, every push to `main` triggers a remote build and deploy.
 
 ## Adding more regions on Fly
 
-Each region is its own app on Fly (cleanest for the demo — distinct URLs, independent state):
+Each region is its own app + its own Postgres on Fly:
 
 ```bash
 fly apps create rwc-fra
-fly volumes create rwc_storage --app rwc-fra --region fra --size 1
-fly secrets set RAILS_MASTER_KEY=$(cat config/master.key) --app rwc-fra
-# Override REGION for the badge
-fly secrets set REGION=fra --app rwc-fra
+fly ext supabase create --app rwc-fra --region fra
+fly secrets set RAILS_MASTER_KEY=$(cat config/master.key) REGION=fra --app rwc-fra
 fly deploy --app rwc-fra --config fly.toml --remote-only
 ```
 
@@ -208,9 +210,10 @@ fly machine restart --app rwc-tyo <machine-id>
 
 ## Pricing
 
-`shared-cpu-1x@256mb` ≈ $2/mo per region, plus ~$0.15/mo per GB of volume. Three regions ≈ $7/mo total.
+`shared-cpu-1x@1gb` Machine ≈ ~$5/mo per region, plus Supabase Managed Postgres at ~$20–25/mo per region (free tier exists but pauses on inactivity — not ideal for a demo you point at a URL). Three regions ≈ $75–90/mo total. Cheaper than running production at Aura was; expensive for a toy. Tear down between demos if cost matters.
 
 ## Caveats
 
-- The listener runs as a background process, not a separately supervised one. If the Go binary crashes, Rails keeps running but no new prices flow. For a conference demo that's fine; for production you'd want proper supervision (s6-overlay, or a separate Machine pinned to the same volume — Fly Volumes can only be attached to one Machine at a time, so that path requires more thought).
+- The listener runs as a background process, not a separately supervised one. If the Go binary crashes, Rails keeps running but no new prices flow. Restart via `fly machine restart`. For production you'd want proper supervision (s6-overlay or a separate process group).
 - Fly's natural model is one app many regions with anycast routing. We're explicitly *not* doing that here, because the demo needs distinct per-region URLs so the audience can compare them side-by-side.
+- Postgres adds ~1–2 ms per query vs SQLite, but removes the single-writer contention that capped throughput on the SQLite version. Net win on a hot WebSocket feed.

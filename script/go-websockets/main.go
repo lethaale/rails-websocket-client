@@ -27,14 +27,9 @@ func main() {
 		wsURL = _defaultURL
 	}
 
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		log.Fatalf("Environment variable DB_PATH not set")
-	}
-
-	st, err := store.NewSQLiteStore(dbPath)
+	st, err := openStore()
 	if err != nil {
-		log.Fatalf("failed to open sqlite store: %v", err)
+		log.Fatalf("failed to open store: %v", err)
 	}
 	defer st.Close()
 
@@ -44,7 +39,7 @@ func main() {
 	}
 	defer conn.Close(websocket.StatusGoingAway, "shutdown")
 
-	log.Printf("connected to %s; writing jobs into %s", wsURL, dbPath)
+	log.Printf("connected to %s", wsURL)
 
 	for {
 		select {
@@ -73,4 +68,22 @@ func main() {
 			log.Printf("store error: %v", err)
 		}
 	}
+}
+
+// Picks the store implementation based on which env var is set:
+//   - DATABASE_URL  → Postgres (production / Fly)
+//   - DB_PATH       → SQLite   (development / Procfile.dev)
+//
+// DATABASE_URL wins if both are set.
+func openStore() (store.Store, error) {
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		log.Printf("DATABASE_URL set, using Postgres store")
+		return store.NewPGStore(dsn)
+	}
+	if path := os.Getenv("DB_PATH"); path != "" {
+		log.Printf("DB_PATH=%s, using SQLite store", path)
+		return store.NewSQLiteStore(path)
+	}
+	log.Fatalf("either DATABASE_URL or DB_PATH must be set")
+	return nil, nil
 }
