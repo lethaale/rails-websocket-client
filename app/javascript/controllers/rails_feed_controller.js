@@ -12,7 +12,7 @@ export default class extends Controller {
     "content", "viewport",
     "mean", "p1", "p50", "p95", "p99", "stddev", "jitter",
     "msgPerSec", "msgPerMin", "msgPerHour",
-    "dropRate", "total", "uptime"
+    "dropRate", "total", "uptime", "currentPrice"
   ]
 
   connect() {
@@ -37,9 +37,9 @@ export default class extends Controller {
       }
     }
     while (this.contentTarget.children.length > MAX_ROWS) {
-      this.contentTarget.removeChild(this.contentTarget.firstChild)
+      this.contentTarget.removeChild(this.contentTarget.lastChild)
     }
-    this.scrollToBottom()
+    this.scrollToTop()
   }
 
   recordRow(row) {
@@ -52,6 +52,10 @@ export default class extends Controller {
       observedAt: observed,
       tradeId: Number.isFinite(tradeId) ? tradeId : undefined,
     })
+    const price = Number(row.dataset.price)
+    if (Number.isFinite(price) && this.hasCurrentPriceTarget) {
+      this.currentPriceTarget.textContent = formatCurrency(price)
+    }
     this.dirty = true
   }
 
@@ -65,8 +69,13 @@ export default class extends Controller {
     this.dirty = false
   }
 
-  scrollToBottom() {
+  scrollToTop() {
     const el = this.hasViewportTarget ? this.viewportTarget : this.contentTarget
-    el.scrollTop = el.scrollHeight
+    el.scrollTop = 0
   }
+}
+
+function formatCurrency(n) {
+  if (!Number.isFinite(n)) return "--"
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

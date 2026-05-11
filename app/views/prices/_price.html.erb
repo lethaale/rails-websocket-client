@@ -7,6 +7,7 @@
   id="price_<%= price.persisted? ? price.id : SecureRandom.hex(8) %>"
   class="even:bg-gray-50"
   data-binance-time="<%= (price.binance_time.to_r * 1000).to_i %>"
+  data-price="<%= price.price %>"
   <% if observed_ms %>data-observed-at="<%= observed_ms %>"<% end %>
   <% if trade_id %>data-trade-id="<%= trade_id %>"<% end %>
 >

@@ -20,9 +20,13 @@
       class="space-y-3"
     >
       <div class="flex items-center justify-between">
-        <h2 class="flex items-center gap-1.5 text-lg font-semibold text-gray-900">
+        <h2 class="flex items-center gap-2 text-lg font-semibold text-gray-900">
           JS Direct
           <span class="text-xs font-normal text-gray-500">browser → Binance</span>
+          <span
+            class="ml-1 rounded-md bg-emerald-50 px-2 py-0.5 font-mono text-base text-emerald-700 tabular-nums"
+            data-direct-feed-target="currentPrice"
+          >--</span>
           <%= render "info_icon", text: "Pure-JS path: this browser tab opens a WebSocket straight to Binance. No Rails, no server round-trip on the data path. The baseline." %>
         </h2>
         <span
@@ -51,9 +55,13 @@
     <%# Right: Rails path %>
     <section data-controller="rails-feed" class="space-y-3">
       <div class="flex items-center justify-between">
-        <h2 class="flex items-center gap-1.5 text-lg font-semibold text-gray-900">
+        <h2 class="flex items-center gap-2 text-lg font-semibold text-gray-900">
           Rails
           <span class="text-xs font-normal text-gray-500">Go → Solid Queue → Active Job → Turbo Stream</span>
+          <span
+            class="ml-1 rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-base text-indigo-700 tabular-nums"
+            data-rails-feed-target="currentPrice"
+          >--</span>
           <%= render "info_icon", text: "Rails path: a Go process holds the WebSocket and writes Active Job rows directly into Solid Queue's SQLite tables. Rails picks them up, broadcasts via Turbo Stream, and your browser renders the row." %>
         </h2>
       </div>

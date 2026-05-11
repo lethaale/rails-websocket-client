@@ -23,5 +23,9 @@ module RailsWebsocketClient
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+
+    # Toy demo — we don't care about job history. Keep finished jobs for 5
+    # minutes, then the recurring cleanup in config/recurring.yml wipes them.
+    config.solid_queue.clear_finished_jobs_after = 5.minutes
   end
 end

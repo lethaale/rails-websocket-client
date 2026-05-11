@@ -13,7 +13,7 @@ class InsertPriceJob < ApplicationJob
       symbol: binance_message["s"],
     )
 
-    Turbo::StreamsChannel.broadcast_append_to(
+    Turbo::StreamsChannel.broadcast_prepend_to(
       "prices",
       target: "prices-list",
       partial: "prices/price",

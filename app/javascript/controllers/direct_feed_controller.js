@@ -14,7 +14,7 @@ export default class extends Controller {
     "mean", "p1", "p50", "p95", "p99", "stddev", "jitter",
     "msgPerSec", "msgPerMin", "msgPerHour",
     "dropRate", "internalMean", "internalP95", "internalMax",
-    "total", "uptime", "status"
+    "total", "uptime", "status", "currentPrice"
   ]
 
   connect() {
@@ -63,14 +63,16 @@ export default class extends Controller {
   appendRow(msg, observedAt) {
     const row = document.createElement("tr")
     row.className = "even:bg-gray-50"
+    row.dataset.price = msg.p
     const latency = observedAt - msg.E
-    const price = Number(msg.p).toFixed(2)
+    const priceNum = Number(msg.p)
+    const priceText = formatCurrency(priceNum)
     const binanceTime = formatClockMs(msg.E)
     const observedTime = formatClockMs(observedAt)
 
     row.innerHTML = `
       <td class="px-4 py-3 font-mono text-sm font-semibold text-gray-900">${escapeHtml(msg.s || "")}</td>
-      <td class="px-4 py-3 text-right font-mono text-sm text-gray-900">$${price}</td>
+      <td class="px-4 py-3 text-right font-mono text-sm text-gray-900">${priceText}</td>
       <td class="px-4 py-3 text-sm text-gray-700">${binanceTime}</td>
       <td class="px-4 py-3 text-sm text-gray-700">
         ${observedTime}
@@ -78,11 +80,12 @@ export default class extends Controller {
       </td>
     `
 
-    this.contentTarget.appendChild(row)
+    this.contentTarget.prepend(row)
     while (this.contentTarget.children.length > MAX_ROWS) {
-      this.contentTarget.removeChild(this.contentTarget.firstChild)
+      this.contentTarget.removeChild(this.contentTarget.lastChild)
     }
-    this.scrollToBottom()
+    if (this.hasCurrentPriceTarget) this.currentPriceTarget.textContent = priceText
+    this.scrollToTop()
   }
 
   maybeRender() {
@@ -99,10 +102,15 @@ export default class extends Controller {
     if (this.hasStatusTarget) this.statusTarget.textContent = value
   }
 
-  scrollToBottom() {
+  scrollToTop() {
     const el = this.hasViewportTarget ? this.viewportTarget : this.contentTarget
-    el.scrollTop = el.scrollHeight
+    el.scrollTop = 0
   }
+}
+
+function formatCurrency(n) {
+  if (!Number.isFinite(n)) return "--"
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatClockMs(ms) {
