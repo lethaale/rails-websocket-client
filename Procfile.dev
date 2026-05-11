@@ -1,3 +1,4 @@
 web: bin/rails server
 css: bin/rails tailwindcss:watch
 jobs: bin/jobs
+listener: cd script/go-websockets && DB_PATH=../../storage/development_queue.sqlite3 go run .

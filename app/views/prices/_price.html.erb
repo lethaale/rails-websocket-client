@@ -1,8 +1,14 @@
+<%# locals: (price:, observed_at: nil, trade_id: nil) %>
+<%
+  observed = observed_at || price.created_at
+  observed_ms = observed ? (observed.to_r * 1000).to_i : nil
+%>
 <tr
-  id="<%= dom_id(price) %>"
+  id="price_<%= price.persisted? ? price.id : SecureRandom.hex(8) %>"
   class="even:bg-gray-50"
   data-binance-time="<%= (price.binance_time.to_r * 1000).to_i %>"
-  data-created-at="<%= (price.created_at.to_r * 1000).to_i %>"
+  <% if observed_ms %>data-observed-at="<%= observed_ms %>"<% end %>
+  <% if trade_id %>data-trade-id="<%= trade_id %>"<% end %>
 >
   <td class="px-4 py-3 font-mono text-sm font-semibold text-gray-900"><%= price.symbol %></td>
   <td class="px-4 py-3 text-right font-mono text-sm text-gray-900">
@@ -12,9 +18,11 @@
     <%= price.binance_time&.strftime("%H:%M:%S.%L") %>
   </td>
   <td class="px-4 py-3 text-sm text-gray-700">
-    <%= price.created_at&.strftime("%H:%M:%S.%L") %>
-    <p class="text-xs text-gray-500">
-      Latency <b><%= ((price.created_at - price.binance_time) * 1000).round(3) %></b> ms
-    </p>
+    <%= observed&.strftime("%H:%M:%S.%L") %>
+    <% if observed && price.binance_time %>
+      <p class="text-xs text-gray-500">
+        Latency <b><%= ((observed - price.binance_time) * 1000).round(1) %></b> ms
+      </p>
+    <% end %>
   </td>
 </tr>

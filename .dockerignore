@@ -49,3 +49,6 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Go listener — built and shipped as its own image.
+/script

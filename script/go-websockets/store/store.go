@@ -36,6 +36,21 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	// SQLite does not benefit from many concurrent writers; keep it simple.
 	db.SetMaxOpenConns(1)
 
+	// Rails opens the same file (queue/cable/cache). Wait up to 5s when the
+	// writer lock is held instead of erroring with SQLITE_BUSY immediately.
+	// WAL is already on (Rails 8 default); set it idempotently so we don't
+	// depend on which process opened the file first.
+	for _, pragma := range []string{
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA busy_timeout = 5000",
+		"PRAGMA synchronous = NORMAL",
+	} {
+		if _, err := db.Exec(pragma); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("%s: %w", pragma, err)
+		}
+	}
+
 	return &SQLiteStore{
 		db: db,
 	}, nil

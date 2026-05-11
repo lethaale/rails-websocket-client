@@ -1,40 +1,85 @@
-<div class="max-w-6xl mx-auto space-y-6" data-controller="auto-scroll">
-  <div class="flex items-center justify-between gap-4">
-    <div>
-      <h1 class="text-3xl font-bold text-gray-900">Live Prices</h1>
+<div class="w-full space-y-4">
+  <header class="flex items-start justify-between gap-4">
+    <div class="space-y-1">
+      <h1 class="text-2xl font-bold text-gray-900">Rails Is The Client — latency comparison</h1>
+      <p class="text-sm text-gray-600">Same Binance feed, two paths. Stats are computed entirely in your browser.</p>
     </div>
-    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <p class="text-xs uppercase tracking-wide text-gray-500">Avg Ingest latency (created_at - binance_time)</p>
-      <p class="mt-2 text-2xl font-semibold text-gray-900" data-auto-scroll-target="ingestAverage">--</p>
-    </div>
-  </div>
+    <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-900 px-3 py-1 text-xs font-mono uppercase tracking-wide text-white">
+      region: <%= ENV.fetch("REGION", "local") %>
+      <%= render "info_icon", text: "Which deployment served this page. Set via the REGION env var per Kamal destination. 'local' means you're running it on your machine." %>
+    </span>
+  </header>
 
-  <%= turbo_stream_from "prices" %>
+  <%= render "comparison" %>
 
-  <div
-    class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
-  >
-    <div
-      class="overflow-y-auto max-h-[70vh]"
-      data-auto-scroll-target="viewport"
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <%# Left: JS Direct %>
+    <section
+      data-controller="direct-feed"
+      data-direct-feed-url-value="wss://stream.binance.com:9443/ws/btcusdt@trade"
+      class="space-y-3"
     >
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50 sticky top-0 z-10">
-          <tr>
-            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Symbol</th>
-            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Price in USD</th>
-            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Binance time</th>
-            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">DB created at</th>
-          </tr>
-        </thead>
-        <tbody
-          id="prices-list"
-          class="divide-y divide-gray-100"
-          data-auto-scroll-target="content"
-        >
-          <%= render @prices %>
-        </tbody>
-      </table>
-    </div>
+      <div class="flex items-center justify-between">
+        <h2 class="flex items-center gap-1.5 text-lg font-semibold text-gray-900">
+          JS Direct
+          <span class="text-xs font-normal text-gray-500">browser → Binance</span>
+          <%= render "info_icon", text: "Pure-JS path: this browser tab opens a WebSocket straight to Binance. No Rails, no server round-trip on the data path. The baseline." %>
+        </h2>
+        <span
+          class="text-xs font-mono uppercase tracking-wide text-gray-500"
+          data-direct-feed-target="status"
+        >connecting</span>
+      </div>
+      <%= render "stats_panel", controller: "direct-feed", show_drop_rate: true, show_binance_internal: true %>
+      <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-y-auto max-h-[60vh]" data-direct-feed-target="viewport">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0 z-10">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Symbol</th>
+                <th class="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Price</th>
+                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Binance time</th>
+                <th class="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Observed at</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100" data-direct-feed-target="content"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <%# Right: Rails path %>
+    <section data-controller="rails-feed" class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="flex items-center gap-1.5 text-lg font-semibold text-gray-900">
+          Rails
+          <span class="text-xs font-normal text-gray-500">Go → Solid Queue → Active Job → Turbo Stream</span>
+          <%= render "info_icon", text: "Rails path: a Go process holds the WebSocket and writes Active Job rows directly into Solid Queue's SQLite tables. Rails picks them up, broadcasts via Turbo Stream, and your browser renders the row." %>
+        </h2>
+      </div>
+      <%= turbo_stream_from "prices" %>
+      <%= render "stats_panel", controller: "rails-feed", show_drop_rate: true %>
+      <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-y-auto max-h-[60vh]" data-rails-feed-target="viewport">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0 z-10">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Symbol</th>
+                <th class="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Price</th>
+                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Binance time</th>
+                <th class="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Observed at</th>
+              </tr>
+            </thead>
+            <tbody
+              id="prices-list"
+              class="divide-y divide-gray-100"
+              data-rails-feed-target="content"
+            >
+              <%= render @prices %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </div>
 </div>

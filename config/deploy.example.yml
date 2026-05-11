@@ -1,0 +1,23 @@
+# Per-region destination template. Copy to deploy.<region>.yml (e.g. deploy.nyc.yml) and fill in.
+# Kamal merges this on top of config/deploy.yml when invoked with `-d <region>`.
+#
+# Example:
+#   cp config/deploy.example.yml config/deploy.nyc.yml
+#   # edit it
+#   bin/kamal deploy -d nyc
+
+servers:
+  web:
+    - 203.0.113.10        # public IP of this region's box
+
+proxy:
+  ssl: false
+  host: 203-0-113-10.sslip.io  # sslip.io resolves any IP-shaped hostname, no DNS needed
+
+env:
+  clear:
+    REGION: nyc           # short label, surfaced in the UI
+
+accessories:
+  listener:
+    host: 203.0.113.10    # same box; the Go listener shares the SQLite volume with Rails

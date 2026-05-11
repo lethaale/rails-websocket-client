@@ -1,0 +1,59 @@
+<%# locals: (controller:, show_drop_rate: false, show_binance_internal: false) %>
+<%
+  help = {
+    "mean"         => "Average end-to-end latency: Binance event time (E) → row appearing in this tab.",
+    "p1"           => "Best-case latency. 1% of messages arrive faster than this — the floor of what this path can do.",
+    "p50"          => "Median latency. Half of messages are faster than this, half slower.",
+    "p95"          => "95th percentile. 95% of messages arrive within this time — what most users feel.",
+    "p99"          => "99th percentile. 1 in 100 messages is slower than this — the outliers that hurt.",
+    "stddev"       => "Standard deviation of latency. Higher = more inconsistent stream.",
+    "jitter"       => "Mean absolute change between consecutive latencies. Measures how spiky the stream feels.",
+    "msgPerSec"    => "Messages received in the last second.",
+    "msgPerMin"    => "Messages received in the last 60 seconds.",
+    "msgPerHour"   => "Messages received in the last hour (rolling window).",
+    "total"        => "Total messages received since this page loaded.",
+    "uptime"       => "How long this page has been receiving data.",
+    "dropRate"     => "Fraction of messages we never received, inferred from gaps in Binance's trade ID sequence.",
+    "internalMean" => "Average gap between trade time (T) and event time (E) on Binance's side. Upstream-internal, independent of your pipeline.",
+    "internalP95"  => "95th percentile of the upstream-internal E−T gap.",
+    "internalMax"  => "Largest E−T gap observed this run.",
+  }
+  attr = "data-#{controller}-target"
+  cell = ->(label, target) {
+    info = render("info_icon", text: help[target])
+    label_html = content_tag(:p, class: "flex items-center gap-1 text-[10px] uppercase tracking-wide text-gray-500") do
+      safe_join([label, info])
+    end
+    value_html = content_tag(:p, "--", class: "mt-1 text-base font-semibold text-gray-900 tabular-nums", attr => target)
+    content_tag(:div, label_html + value_html, class: "rounded-lg border border-gray-200 bg-white p-3 shadow-sm")
+  }
+%>
+
+<div class="grid grid-cols-3 gap-2">
+  <%= cell.call("Mean latency", "mean") %>
+  <%= cell.call("p1", "p1") %>
+  <%= cell.call("p50", "p50") %>
+  <%= cell.call("p95", "p95") %>
+  <%= cell.call("p99", "p99") %>
+  <%= cell.call("Stddev", "stddev") %>
+  <%= cell.call("Jitter", "jitter") %>
+  <%= cell.call("Msg/sec", "msgPerSec") %>
+  <%= cell.call("Msg/min", "msgPerMin") %>
+  <%= cell.call("Msg/hour", "msgPerHour") %>
+  <%= cell.call("Total", "total") %>
+  <%= cell.call("Uptime", "uptime") %>
+  <% if show_drop_rate %>
+    <%= cell.call("Drop rate", "dropRate") %>
+  <% end %>
+</div>
+
+<% if show_binance_internal %>
+  <div class="grid grid-cols-3 gap-2">
+    <%= cell.call("Binance E−T mean", "internalMean") %>
+    <%= cell.call("Binance E−T p95", "internalP95") %>
+    <%= cell.call("Binance E−T max", "internalMax") %>
+  </div>
+  <p class="text-[10px] text-gray-500 leading-snug">
+    Upstream-internal delay: how long after a match Binance emits the WS event. Independent of your pipeline.
+  </p>
+<% end %>

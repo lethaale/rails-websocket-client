@@ -1,0 +1,69 @@
+<div
+  data-controller="comparison"
+  class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3"
+>
+  <div class="flex items-baseline justify-between">
+    <h2 class="flex items-center gap-1.5 text-lg font-semibold text-gray-900">
+      How much are you paying to go through Rails?
+      <%= render "info_icon", text: "Per-percentile latency of going through Rails (indigo) vs straight from the browser (emerald). Bars are normalized within each row to the larger value, so each row visually answers: how much taller is the Rails bar?" %>
+    </h2>
+    <div class="flex items-center gap-3 text-[11px] uppercase tracking-wide text-gray-500">
+      <span class="flex items-center gap-1">
+        <span class="inline-block h-2 w-2 rounded bg-emerald-500"></span>Direct
+        <%= render "info_icon", text: "JS-Direct path: the browser opens its own WebSocket to Binance, no Rails involved." %>
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="inline-block h-2 w-2 rounded bg-indigo-500"></span>Rails
+        <%= render "info_icon", text: "Rails path: Go listener → Solid Queue → Active Job → Turbo Stream broadcast → this tab." %>
+      </span>
+    </div>
+  </div>
+
+  <%
+    cmp_help = {
+      "mean" => "Mean extra latency Rails adds vs going direct from the browser.",
+      "p1"   => "Best-case extra latency. 1% of messages on each path arrive this fast (or faster).",
+      "p50"  => "Median extra latency. Where the typical message lands on each path.",
+      "p95"  => "95th-percentile extra latency. What most users feel.",
+      "p99"  => "99th-percentile extra latency. The outlier tax — the worst 1% on each path.",
+    }
+  %>
+
+  <div class="space-y-2">
+    <% [
+         ["mean", "Mean"],
+         ["p1",   "p1"],
+         ["p50",  "p50"],
+         ["p95",  "p95"],
+         ["p99",  "p99"],
+       ].each do |key, label| %>
+      <div
+        class="grid grid-cols-[60px_1fr_140px] items-center gap-3"
+        data-comparison-target="row"
+        data-key="<%= key %>"
+      >
+        <span class="flex items-center gap-1 text-xs font-mono uppercase tracking-wide text-gray-500">
+          <%= label %>
+          <%= render "info_icon", text: cmp_help[key] %>
+        </span>
+
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 text-xs">
+            <div class="relative h-3 flex-1 overflow-hidden rounded bg-gray-100">
+              <div class="absolute inset-y-0 left-0 bg-emerald-500 transition-[width] duration-150" data-cell="directBar" style="width:0%"></div>
+            </div>
+            <span class="w-20 text-right font-mono tabular-nums text-gray-700" data-cell="directValue">--</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <div class="relative h-3 flex-1 overflow-hidden rounded bg-gray-100">
+              <div class="absolute inset-y-0 left-0 bg-indigo-500 transition-[width] duration-150" data-cell="railsBar" style="width:0%"></div>
+            </div>
+            <span class="w-20 text-right font-mono tabular-nums text-gray-700" data-cell="railsValue">--</span>
+          </div>
+        </div>
+
+        <span class="text-right font-mono tabular-nums text-sm font-semibold text-gray-900" data-cell="delta">--</span>
+      </div>
+    <% end %>
+  </div>
+</div>

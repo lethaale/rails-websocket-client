@@ -1,0 +1,11 @@
+<%# locals: (text: nil) %>
+<% if text.present? %>
+  <span class="group relative inline-flex items-center align-middle">
+    <svg class="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fill-rule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a1 1 0 0 0 0 2v3a1 1 0 0 0 1 1h1a1 1 0 1 0 0-2v-3a1 1 0 0 0-1-1H9Z" clip-rule="evenodd"/>
+    </svg>
+    <span class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-56 -translate-x-1/2 whitespace-normal rounded-md bg-gray-900 px-2.5 py-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-white shadow-lg group-hover:block">
+      <%= text %>
+    </span>
+  </span>
+<% end %>

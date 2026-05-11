@@ -21,20 +21,27 @@ The Go helper under `script/go-websockets` connects to Binance trades (`btcusdt@
 
 Requirements: Go 1.25+ (or current Go toolchain) and network access to `wss://stream.binance.com`.
 
-Setup & run:
+`bin/dev` already starts the listener alongside Rails (see `Procfile.dev`). First time only, fetch Go modules:
 
 ```bash
-cd script/go-websockets
-# First time: fetch modules
-go mod tidy
-# Run (defaults: DB_PATH=queue.sqlite3, WS_URL=wss://stream.binance.com:9443/ws/btcusdt@trade)
-go run .
+(cd script/go-websockets && go mod tidy)
 ```
+
+To run it standalone (from the project root):
+
+```bash
+(cd script/go-websockets && DB_PATH=../../storage/development_queue.sqlite3 go run .)
+```
+
+`DB_PATH` is required — it must point at the Solid Queue SQLite file that Rails reads.
+The path differs by Rails environment (see `config/database.yml`):
+
+- development: `storage/development_queue.sqlite3`
+- production:  `storage/production_queue.sqlite3`
 
 Optional env vars:
 
-- `DB_PATH` – path to the SQLite file (will be created if missing)
-- `WS_URL` – override the websocket stream URL
+- `WS_URL` – override the websocket stream URL (default: `wss://stream.binance.com:9443/ws/btcusdt@trade`)
 
 ## Usage
 
