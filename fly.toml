@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for rails-websocket-client on 2026-05-11T21:28:39Z
+# fly.toml app configuration file generated for rails-websocket-client on 2026-05-11T23:22:12Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -10,9 +10,6 @@ primary_region = 'nrt'
   dockerfile = 'Dockerfile'
 
 [env]
-  # DATABASE_URL is injected by Fly's Supabase Managed Postgres add-on; do not
-  # hard-code it here. The Go listener picks Postgres automatically when this
-  # var is set (see script/go-websockets/main.go).
   HTTP_PORT = '8080'
   RAILS_ENV = 'production'
   RAILS_LOG_TO_STDOUT = '1'
