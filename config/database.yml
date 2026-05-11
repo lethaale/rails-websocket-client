@@ -6,6 +6,12 @@ default: &default
   encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
+# Solid Queue runs more threads than Puma (10 workers + dispatcher/supervisor),
+# so the queue connection needs a larger pool than the default.
+queue_default: &queue_default
+  <<: *default
+  pool: <%= ENV.fetch("QUEUE_DB_POOL", 15) %>
+
 development:
   primary:
     <<: *default
@@ -15,7 +21,7 @@ development:
     database: rails_websocket_client_development_cache
     migrations_paths: db/cache_migrate
   queue:
-    <<: *default
+    <<: *queue_default
     database: rails_websocket_client_development_queue
     migrations_paths: db/queue_migrate
   cable:
@@ -43,7 +49,7 @@ production:
     url: <%= ENV["CACHE_DATABASE_URL"] %>
     migrations_paths: db/cache_migrate
   queue:
-    <<: *default
+    <<: *queue_default
     url: <%= ENV["QUEUE_DATABASE_URL"] %>
     migrations_paths: db/queue_migrate
   cable:
