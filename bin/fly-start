@@ -1,14 +1,32 @@
 #!/bin/bash
-# Fly.io launcher: runs Rails and the Go listener in one Machine so they can
-# share the SQLite files in /rails/storage.
+# Fly.io launcher: runs Rails and the Go listener on a single Machine so they
+# can share /rails/storage. Rails boots first; the listener only starts once
+# the /up health endpoint is responding, so the Go process doesn't contend
+# with Rails for the SQLite write lock during boot.
 set -e
 
 # Prepare the database the same way the standard docker-entrypoint would.
 ./bin/rails db:prepare
 
-# Start the Go listener in the background. It writes Active Job rows into the
-# Solid Queue tables that Rails reads.
-/usr/local/bin/listener &
+# In a subshell, wait until Rails is accepting requests, then exec the
+# listener. The subshell runs in parallel with the Rails server below.
+# - If Rails comes up, the listener starts and runs until it (or the Machine)
+#   dies. Rails stays in the foreground, so listener failures don't bring the
+#   Machine down.
+# - If Rails never becomes healthy within the timeout, we log and give up on
+#   the listener; Rails itself will crash on its own error and Fly will
+#   restart the Machine.
+(
+  health_url="http://127.0.0.1:${HTTP_PORT:-8080}/up"
+  for attempt in $(seq 1 60); do
+    if curl --fail --silent --show-error --max-time 1 "$health_url" > /dev/null 2>&1; then
+      echo "[fly-start] Rails healthy after ${attempt}s, starting listener"
+      exec /usr/local/bin/listener
+    fi
+    sleep 1
+  done
+  echo "[fly-start] Rails health probe timed out after 60s, listener not started" >&2
+) &
 
-# Rails in the foreground — its exit drives the Machine's lifecycle.
+# Rails in the foreground — its lifecycle drives the Machine.
 exec ./bin/thrust ./bin/rails server
