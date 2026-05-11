@@ -53,6 +53,10 @@ Rails.application.configure do
   config.active_job.queue_adapter = :solid_queue
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
+  # Toy demo — no sensitive data in the queue. Skip Mission Control's HTTP basic
+  # auth so /jobs is reachable on the conference URL without credentials.
+  config.mission_control.jobs.http_basic_auth_enabled = false
+
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
   # config.action_mailer.raise_delivery_errors = false
