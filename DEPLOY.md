@@ -156,8 +156,8 @@ If you'd rather skip the manual Vultr provisioning and Docker Hub build/push, Fl
 
 - **One unified Docker image** built by `Dockerfile`. A `golang:1.25-alpine` build stage produces the listener binary and copies it to `/usr/local/bin/listener` in the final image; same image runs Rails.
 - **One Machine per app**, running `bin/fly-start` — a tiny script that prepares the database, loads the Solid Queue / Cable / Cache schemas, then runs Rails in the foreground and the Go listener in the background once Rails is healthy.
-- **Postgres instead of SQLite.** Production uses a Fly Managed Postgres (Supabase) instance per app. `DATABASE_URL` is auto-injected as a Fly secret; both Rails and the Go listener read it. No volume mounts, no SQLite contention.
-- **One Fly app per region** (`rwc-tyo`, `rwc-fra`, `rwc-nyc`). Each gets its own hostname and its own Postgres database, fully independent — what you want for a geo-latency demo.
+- **Postgres instead of SQLite.** Production uses a Fly Managed Postgres (MPG) cluster per app. The four `*_DATABASE_URL` secrets are wired by `fly mpg attach`; both Rails and the Go listener read them. No volume mounts, no SQLite contention.
+- **One Fly app per region** (`rwc-tyo`, `rwc-fra`, `rwc-nyc`). Each gets its own hostname and its own Postgres cluster, fully independent — what you want for a geo-latency demo.
 
 ## First-time setup
 
@@ -166,49 +166,70 @@ brew install flyctl
 fly auth login
 ```
 
-Create the Tokyo app and provision its database:
+`fly.toml` is region-neutral: no `primary_region`, no `REGION` env. Pass `--primary-region` at deploy time and set the per-region `REGION` as a secret.
+
+### Tokyo (`nrt`)
 
 ```bash
+# 1. Create the app shell.
 fly apps create rwc-tyo
 
-# Provision Supabase-managed Postgres in the same region. This injects
-# DATABASE_URL into the app's secrets automatically.
-fly ext supabase create --app rwc-tyo --region nrt
-```
+# 2. Provision the Managed Postgres cluster (Basic plan, $38/mo).
+#    Capture the cluster ID from the output (looks like `1zqyxr7dyeerwp8m`).
+fly mpg create -n rwc-tyo-db -r nrt --plan Basic
+CLUSTER=<paste-cluster-id-here>
 
-Supabase gives one Postgres server with a single default database. Rails' multi-database setup wants four (primary, queue, cable, cache), so create the other three and wire up their URLs as Fly secrets. From a local shell where the connection string is convenient:
+# 3. Create the three extra databases on that cluster. The default
+#    `fly-db` becomes DATABASE_URL (primary); these become queue/cable/cache.
+fly mpg databases create $CLUSTER -n rwc_queue
+fly mpg databases create $CLUSTER -n rwc_cable
+fly mpg databases create $CLUSTER -n rwc_cache
 
-```bash
-# Open a psql against the new server (use the connection string Supabase shows
-# you in its dashboard, or pull DATABASE_URL out of the Fly secrets UI).
-PG_URL="postgres://postgres.<ref>:<pw>@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+# 4. Attach the cluster four times — once per logical database — so each
+#    one lands as its own secret on the app.
+fly mpg attach $CLUSTER -a rwc-tyo                                            # DATABASE_URL → fly-db
+fly mpg attach $CLUSTER -a rwc-tyo -d rwc_queue --variable-name QUEUE_DATABASE_URL
+fly mpg attach $CLUSTER -a rwc-tyo -d rwc_cable --variable-name CABLE_DATABASE_URL
+fly mpg attach $CLUSTER -a rwc-tyo -d rwc_cache --variable-name CACHE_DATABASE_URL
 
-psql "$PG_URL" <<'SQL'
-  CREATE DATABASE rwc_queue;
-  CREATE DATABASE rwc_cable;
-  CREATE DATABASE rwc_cache;
-SQL
+# 5. The non-DB secrets: Rails master key + the region badge.
+fly secrets set --app rwc-tyo \
+  RAILS_MASTER_KEY="$(cat config/master.key)" \
+  REGION=tyo
 
-# Derive the three additional URLs by swapping the database name and feed them
-# to Fly as secrets. The Go listener also reads QUEUE_DATABASE_URL.
-queue_url=$(echo "$PG_URL"  | sed 's|/postgres$|/rwc_queue|')
-cable_url=$(echo "$PG_URL"  | sed 's|/postgres$|/rwc_cable|')
-cache_url=$(echo "$PG_URL"  | sed 's|/postgres$|/rwc_cache|')
-
-fly secrets set \
-  RAILS_MASTER_KEY=$(cat config/master.key) \
-  QUEUE_DATABASE_URL="$queue_url" \
-  CABLE_DATABASE_URL="$cable_url" \
-  CACHE_DATABASE_URL="$cache_url" \
-  --app rwc-tyo
-
-# Build remotely (no local cross-compile) and deploy.
-fly deploy --app rwc-tyo --remote-only
+# 6. Build remotely and deploy. --primary-region pins the machines to nrt.
+fly deploy --app rwc-tyo --remote-only --primary-region nrt --yes
 ```
 
 `bin/fly-start` runs `bin/rails db:prepare` at boot, which loads each schema into its respective database — standard Rails 8 multi-database behavior, nothing custom.
 
 Open `https://rwc-tyo.fly.dev/`. Badge should read **region: tyo**.
+
+### Frankfurt (`fra`)
+
+Same recipe, just substitute region/app/region-badge:
+
+```bash
+fly apps create rwc-fra
+
+fly mpg create -n rwc-fra-db -r fra --plan Basic
+CLUSTER=<paste-cluster-id-here>
+
+fly mpg databases create $CLUSTER -n rwc_queue
+fly mpg databases create $CLUSTER -n rwc_cable
+fly mpg databases create $CLUSTER -n rwc_cache
+
+fly mpg attach $CLUSTER -a rwc-fra
+fly mpg attach $CLUSTER -a rwc-fra -d rwc_queue --variable-name QUEUE_DATABASE_URL
+fly mpg attach $CLUSTER -a rwc-fra -d rwc_cable --variable-name CABLE_DATABASE_URL
+fly mpg attach $CLUSTER -a rwc-fra -d rwc_cache --variable-name CACHE_DATABASE_URL
+
+fly secrets set --app rwc-fra \
+  RAILS_MASTER_KEY="$(cat config/master.key)" \
+  REGION=fra
+
+fly deploy --app rwc-fra --remote-only --primary-region fra --yes
+```
 
 ## Push-to-deploy from GitHub
 
@@ -216,18 +237,7 @@ In the Fly dashboard for the app, **Settings → GitHub** → connect your repo.
 
 ## Adding more regions on Fly
 
-Each region is its own app + its own Supabase Postgres. Repeat the `psql` + four-URL secret dance per region:
-
-```bash
-fly apps create rwc-fra
-fly ext supabase create --app rwc-fra --region fra
-# Create rwc_queue, rwc_cable, rwc_cache databases via psql against the new
-# Postgres server, then set the four secrets as above:
-fly secrets set RAILS_MASTER_KEY=... QUEUE_DATABASE_URL=... \
-                CABLE_DATABASE_URL=... CACHE_DATABASE_URL=... \
-                REGION=fra --app rwc-fra
-fly deploy --app rwc-fra --config fly.toml --remote-only
-```
+Pick a region code from `fly platform regions` (e.g. `nyc`, `sin`, `syd`) and run the same six-step recipe with the new region and app name.
 
 Useful day-2 commands:
 
@@ -236,11 +246,36 @@ fly logs --app rwc-tyo
 fly ssh console --app rwc-tyo
 fly status --app rwc-tyo
 fly machine restart --app rwc-tyo <machine-id>
+fly mpg connect --cluster <cluster-id>    # psql into the managed Postgres
 ```
 
 ## Pricing
 
-`shared-cpu-1x@1gb` Machine ≈ ~$5/mo per region, plus Supabase Managed Postgres at ~$20–25/mo per region (free tier exists but pauses on inactivity — not ideal for a demo you point at a URL). Three regions ≈ $75–90/mo total. Cheaper than running production at Aura was; expensive for a toy. Tear down between demos if cost matters.
+`shared-cpu-1x@1gb` Machine ≈ ~$5/mo per region, plus Fly Managed Postgres Basic at $38/mo per cluster. Two regions ≈ ~$86/mo, three ≈ ~$129/mo. Note Fly auto-creates a second machine per app for HA (~$5/mo extra each) — pass `min_machines_running = 0` in `fly.toml` or `fly machine destroy <id>` the spare if you want a single box per region. Cheaper than running production at Aura was; expensive for a toy. Tear down between demos if cost matters.
+
+## Teardown
+
+These apps are demo-only — billing keeps running until you destroy both the app *and* the Postgres cluster (they're independent resources). Tear everything down with:
+
+```bash
+# Tokyo
+fly mpg list                                            # find the cluster ID if you've lost it
+fly apps destroy rwc-tyo -y
+fly mpg destroy <tyo-cluster-id> -y
+
+# Frankfurt
+fly apps destroy rwc-fra -y
+fly mpg destroy <fra-cluster-id> -y
+```
+
+Verify nothing's left:
+
+```bash
+fly apps list      # rwc-* should be gone
+fly mpg list       # rwc-*-db should be gone
+```
+
+Destroying the app does not destroy its attached MPG cluster — easy to forget and keep paying $38/mo for an unused database. Always run both.
 
 ## Caveats
 

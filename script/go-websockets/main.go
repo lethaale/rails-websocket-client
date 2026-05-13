@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -42,38 +41,84 @@ func main() {
 	}
 	defer st.Close()
 
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	// Binance drops connections after ~24h, and Fly/intermediate proxies can
+	// drop sooner. Reconnect with exponential backoff capped at 30s; reset the
+	// backoff after a session that lasted more than a minute (so a one-off
+	// disconnect doesn't poison the next retry).
+	backoff := time.Second
+	for {
+		if ctx.Err() != nil {
+			log.Println("context canceled, exiting")
+			return
+		}
+
+		started := time.Now()
+		err := runSession(ctx, wsURL, st)
+		if ctx.Err() != nil {
+			return
+		}
+		if time.Since(started) > time.Minute {
+			backoff = time.Second
+		}
+		log.Printf("session ended after %s: %v; reconnecting in %s", time.Since(started).Round(time.Second), err, backoff)
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+
+		backoff *= 2
+		if backoff > 30*time.Second {
+			backoff = 30 * time.Second
+		}
+	}
+}
+
+// runSession dials the stream, reads messages until the connection fails, and
+// returns the terminating error. A 3-minute keepalive ping detects half-open
+// TCP connections that would otherwise hang Read indefinitely.
+func runSession(ctx context.Context, wsURL string, st *store.PGStore) error {
+	sessionCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	conn, _, err := websocket.Dial(sessionCtx, wsURL, nil)
 	if err != nil {
-		log.Fatalf("failed to connect websocket: %v", err)
+		return err
 	}
 	defer conn.Close(websocket.StatusGoingAway, "shutdown")
 
 	log.Printf("connected to %s", wsURL)
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("context canceled, exiting")
-			return
-		default:
-		}
-
-		var raw json.RawMessage
-		if err := wsjson.Read(ctx, conn, &raw); err != nil {
-			if websocket.CloseStatus(err) >= 0 || errors.Is(err, context.Canceled) ||
-				errors.Is(err, context.DeadlineExceeded) {
-				log.Printf("websocket closed: %v", err)
+	go func() {
+		ticker := time.NewTicker(3 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-sessionCtx.Done():
 				return
+			case <-ticker.C:
+				pingCtx, pingCancel := context.WithTimeout(sessionCtx, 10*time.Second)
+				if err := conn.Ping(pingCtx); err != nil {
+					pingCancel()
+					log.Printf("ping failed: %v", err)
+					cancel()
+					return
+				}
+				pingCancel()
 			}
+		}
+	}()
 
-			log.Printf("read error: %v", err)
-			time.Sleep(time.Second)
-			continue
+	for {
+		var raw json.RawMessage
+		if err := wsjson.Read(sessionCtx, conn, &raw); err != nil {
+			return err
 		}
 
 		log.Printf("received message: %s", string(raw))
 
-		if err := st.SaveBinanceData(ctx, raw); err != nil {
+		if err := st.SaveBinanceData(sessionCtx, raw); err != nil {
 			log.Printf("store error: %v", err)
 		}
 	}
