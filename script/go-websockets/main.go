@@ -116,8 +116,6 @@ func runSession(ctx context.Context, wsURL string, st *store.PGStore) error {
 			return err
 		}
 
-		log.Printf("received message: %s", string(raw))
-
 		if err := st.SaveBinanceData(sessionCtx, raw); err != nil {
 			log.Printf("store error: %v", err)
 		}

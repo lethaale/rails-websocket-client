@@ -53,8 +53,13 @@ export default class extends Controller {
       tradeId: Number.isFinite(tradeId) ? tradeId : undefined,
     })
     const price = Number(row.dataset.price)
-    if (Number.isFinite(price) && this.hasCurrentPriceTarget) {
-      this.currentPriceTarget.textContent = formatCurrency(price)
+    if (Number.isFinite(price)) {
+      if (this.hasCurrentPriceTarget) {
+        this.currentPriceTarget.textContent = formatCurrency(price)
+      }
+      window.dispatchEvent(new CustomEvent("feed:price", {
+        detail: { source: "rails", price }
+      }))
     }
     this.dirty = true
   }

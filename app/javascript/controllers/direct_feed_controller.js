@@ -85,6 +85,9 @@ export default class extends Controller {
       this.contentTarget.removeChild(this.contentTarget.lastChild)
     }
     if (this.hasCurrentPriceTarget) this.currentPriceTarget.textContent = priceText
+    window.dispatchEvent(new CustomEvent("feed:price", {
+      detail: { source: "direct", price: priceNum }
+    }))
     this.scrollToTop()
   }
 
