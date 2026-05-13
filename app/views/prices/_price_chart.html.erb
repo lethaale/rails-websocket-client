@@ -1,0 +1,47 @@
+<%# locals: (source:) %>
+<%
+  stroke = source == "rails" ? "#6366f1" : "#10b981" # indigo-500 / emerald-500
+%>
+<div
+  data-controller="price-chart"
+  data-price-chart-source-value="<%= source %>"
+  class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+>
+  <div class="flex items-baseline justify-between text-[10px] font-mono uppercase tracking-wide text-gray-500">
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-2 w-2 rounded" style="background-color: <%= stroke %>"></span>
+      last <span data-price-chart-target="last" class="tabular-nums text-gray-900">--</span>
+    </span>
+    <span class="tabular-nums">
+      window <span data-price-chart-target="window" class="text-gray-700">--</span>
+    </span>
+  </div>
+
+  <div class="mt-2 flex gap-1">
+    <div class="flex w-14 flex-col justify-between py-0.5 text-right text-[10px] font-mono tabular-nums text-gray-500">
+      <span data-price-chart-target="yMax">--</span>
+      <span data-price-chart-target="yMid">--</span>
+      <span data-price-chart-target="yMin">--</span>
+    </div>
+    <svg
+      data-price-chart-target="svg"
+      viewBox="0 0 400 80"
+      preserveAspectRatio="none"
+      class="h-24 flex-1"
+    >
+      <polyline
+        data-price-chart-target="polyline"
+        fill="none"
+        stroke="<%= stroke %>"
+        stroke-width="1.5"
+        vector-effect="non-scaling-stroke"
+        points=""
+      />
+    </svg>
+  </div>
+
+  <div class="mt-1 flex justify-between pl-[60px] text-[10px] font-mono uppercase tracking-wide text-gray-500">
+    <span data-price-chart-target="xOldest">--</span>
+    <span>now</span>
+  </div>
+</div>

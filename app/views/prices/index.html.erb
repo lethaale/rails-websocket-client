@@ -74,6 +74,7 @@
           data-direct-feed-target="status"
         >connecting</span>
       </div>
+      <%= render "price_chart", source: "direct" %>
       <%= render "stats_panel", controller: "direct-feed", show_drop_rate: true, show_binance_internal: true, show_same_price: true %>
       <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="overflow-y-auto max-h-[60vh]" data-direct-feed-target="viewport">
@@ -106,6 +107,7 @@
         </h2>
       </div>
       <%= turbo_stream_from "prices" %>
+      <%= render "price_chart", source: "rails" %>
       <%= render "stats_panel", controller: "rails-feed", show_drop_rate: true %>
       <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="overflow-y-auto max-h-[60vh]" data-rails-feed-target="viewport">
