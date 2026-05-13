@@ -150,3 +150,15 @@ export function formatUptime(seconds) {
   const h = Math.floor(seconds / 3600)
   return `${h}h ${m}m ${s}s`
 }
+
+// Renders a unix-ms timestamp as HH:MM:SS.mmm in the *browser's* timezone.
+// Server-rendered timestamps come from a Fly machine running UTC, so the row
+// partial only emits the raw ms via data-binance-time / data-observed-at and
+// the feed controller fills the visible text using this formatter.
+export function formatClockMs(ms) {
+  if (!Number.isFinite(ms)) return "--"
+  const d = new Date(ms)
+  const pad = (n) => String(n).padStart(2, "0")
+  const pad3 = (n) => String(n).padStart(3, "0")
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad3(d.getMilliseconds())}`
+}

@@ -15,11 +15,11 @@
   <td class="px-4 py-3 text-right font-mono text-sm text-gray-900">
     <%= number_to_currency(price.price, precision: 2) %>
   </td>
-  <td class="px-4 py-3 text-sm text-gray-700">
+  <td class="px-4 py-3 text-sm text-gray-700" data-cell="binanceTime">
     <%= price.binance_time&.strftime("%H:%M:%S.%L") %>
   </td>
   <td class="px-4 py-3 text-sm text-gray-700">
-    <%= observed&.strftime("%H:%M:%S.%L") %>
+    <span data-cell="observedAt"><%= observed&.strftime("%H:%M:%S.%L") %></span>
     <% if observed && price.binance_time %>
       <p class="text-xs text-gray-500">
         Latency <b><%= ((observed - price.binance_time) * 1000).round(1) %></b> ms

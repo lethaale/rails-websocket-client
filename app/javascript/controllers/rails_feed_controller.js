@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { FeedMetrics } from "lib/metrics"
+import { FeedMetrics, formatClockMs } from "lib/metrics"
 import { renderSnapshot } from "lib/stats_panel"
 
 const MAX_ROWS = 100
@@ -46,6 +46,15 @@ export default class extends Controller {
     const binance = Number(row.dataset.binanceTime)
     const observed = Number(row.dataset.observedAt || row.dataset.createdAt)
     if (!Number.isFinite(binance) || !Number.isFinite(observed)) return
+
+    // Rewrite the server-rendered times in the browser's timezone. The Fly
+    // machine runs in UTC, so without this the column shows UTC and confuses
+    // anyone not on UTC.
+    const binanceCell = row.querySelector('[data-cell="binanceTime"]')
+    if (binanceCell) binanceCell.textContent = formatClockMs(binance)
+    const observedCell = row.querySelector('[data-cell="observedAt"]')
+    if (observedCell) observedCell.textContent = formatClockMs(observed)
+
     const tradeId = Number(row.dataset.tradeId)
     this.metrics.record({
       binanceTime: binance,

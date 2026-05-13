@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { FeedMetrics } from "lib/metrics"
+import { FeedMetrics, formatClockMs } from "lib/metrics"
 import { renderSnapshot } from "lib/stats_panel"
 
 const MAX_ROWS = 100
@@ -118,12 +118,6 @@ function formatCurrency(n) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function formatClockMs(ms) {
-  const d = new Date(ms)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad3(d.getMilliseconds())}`
-}
-function pad(n) { return String(n).padStart(2, "0") }
-function pad3(n) { return String(n).padStart(3, "0") }
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
 }
