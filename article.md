@@ -1,3 +1,5 @@
+> ⚠️ Work in progress — draft, not yet final.
+
 # Rails Is the Websocket Client
 
 _External WebSockets, production real-time, $5 a month_
