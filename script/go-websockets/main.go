@@ -41,6 +41,13 @@ func main() {
 	}
 	defer st.Close()
 
+	// Per-symbol filter state: drop messages that are stale (E ≤ last E we
+	// forwarded) or carry the same price as the last one we forwarded. Cuts
+	// Postgres queue inserts dramatically — most BTCUSDT trades fire at the
+	// same dollar price as the previous one, so we skip them.
+	filter := newPriceFilter()
+	go filter.logLoop(ctx)
+
 	// Binance drops connections after ~24h, and Fly/intermediate proxies can
 	// drop sooner. Reconnect with exponential backoff capped at 30s; reset the
 	// backoff after a session that lasted more than a minute (so a one-off
@@ -53,7 +60,7 @@ func main() {
 		}
 
 		started := time.Now()
-		err := runSession(ctx, wsURL, st)
+		err := runSession(ctx, wsURL, st, filter)
 		if ctx.Err() != nil {
 			return
 		}
@@ -78,7 +85,7 @@ func main() {
 // runSession dials the stream, reads messages until the connection fails, and
 // returns the terminating error. A 3-minute keepalive ping detects half-open
 // TCP connections that would otherwise hang Read indefinitely.
-func runSession(ctx context.Context, wsURL string, st *store.PGStore) error {
+func runSession(ctx context.Context, wsURL string, st *store.PGStore, filter *priceFilter) error {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -114,6 +121,10 @@ func runSession(ctx context.Context, wsURL string, st *store.PGStore) error {
 		var raw json.RawMessage
 		if err := wsjson.Read(sessionCtx, conn, &raw); err != nil {
 			return err
+		}
+
+		if !filter.shouldForward(raw) {
+			continue
 		}
 
 		if err := st.SaveBinanceData(sessionCtx, raw); err != nil {

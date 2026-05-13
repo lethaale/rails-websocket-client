@@ -25,6 +25,8 @@ export class FeedMetrics {
     this.tradeCount = 0
     this.startedAt = Date.now()
     this.total = 0
+    this.lastPrice = null
+    this.samePriceCount = 0
   }
 
   record(sample) {
@@ -57,6 +59,13 @@ export class FeedMetrics {
       this.tradeCount += 1
     }
 
+    if (typeof sample.price === "number" && Number.isFinite(sample.price)) {
+      if (this.lastPrice !== null && sample.price === this.lastPrice) {
+        this.samePriceCount += 1
+      }
+      this.lastPrice = sample.price
+    }
+
     this.total += 1
   }
 
@@ -80,6 +89,8 @@ export class FeedMetrics {
       internalMean: mean(this.internals),
       internalP95: percentile(this.internals, 0.95),
       internalMax: this.internalMax,
+      samePriceCount: this.samePriceCount,
+      samePriceRate: this.total > 1 ? this.samePriceCount / (this.total - 1) : null,
     }
   }
 }

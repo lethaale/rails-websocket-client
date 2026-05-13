@@ -25,6 +25,9 @@ export function renderSnapshot(controller, snapshot) {
   set("internalMax", formatMs(snapshot.internalMax))
   set("total", formatInt(snapshot.total))
   set("uptime", formatUptime(snapshot.uptimeSec))
+  set("samePrice", snapshot.samePriceRate == null
+    ? "--"
+    : `${formatRate(snapshot.samePriceRate)} (${formatInt(snapshot.samePriceCount)})`)
 }
 
 function capitalize(s) {

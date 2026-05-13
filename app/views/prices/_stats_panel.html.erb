@@ -1,4 +1,4 @@
-<%# locals: (controller:, show_drop_rate: false, show_binance_internal: false) %>
+<%# locals: (controller:, show_drop_rate: false, show_binance_internal: false, show_same_price: false) %>
 <%
   help = {
     "mean"         => "Average end-to-end latency: Binance event time (E) → row appearing in this tab.",
@@ -17,6 +17,7 @@
     "internalMean" => "Average gap between trade time (T) and event time (E) on Binance's side. Upstream-internal, independent of your pipeline.",
     "internalP95"  => "95th percentile of the upstream-internal E−T gap.",
     "internalMax"  => "Largest E−T gap observed this run.",
+    "samePrice"    => "Share of consecutive messages (N+1 vs N) where the price didn't change. This is what the Go-side filter on the Rails path skips before hitting Solid Queue.",
   }
   attr = "data-#{controller}-target"
   cell = ->(label, target) {
@@ -44,6 +45,9 @@
   <%= cell.call("Uptime", "uptime") %>
   <% if show_drop_rate %>
     <%= cell.call("Drop rate", "dropRate") %>
+  <% end %>
+  <% if show_same_price %>
+    <%= cell.call("Same price as prev", "samePrice") %>
   <% end %>
 </div>
 

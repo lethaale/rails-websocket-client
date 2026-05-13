@@ -14,7 +14,7 @@ export default class extends Controller {
     "mean", "p1", "p50", "p95", "p99", "stddev", "jitter",
     "msgPerSec", "msgPerMin", "msgPerHour",
     "dropRate", "internalMean", "internalP95", "internalMax",
-    "total", "uptime", "status", "currentPrice"
+    "total", "uptime", "status", "currentPrice", "samePrice"
   ]
 
   connect() {
@@ -49,11 +49,13 @@ export default class extends Controller {
     if (typeof msg.E !== "number") return
 
     const observedAt = Date.now()
+    const priceForMetrics = Number(msg.p)
     this.metrics.record({
       binanceTime: msg.E,
       tradeTime: typeof msg.T === "number" ? msg.T : undefined,
       observedAt,
       tradeId: typeof msg.t === "number" ? msg.t : undefined,
+      price: Number.isFinite(priceForMetrics) ? priceForMetrics : undefined,
     })
 
     this.appendRow(msg, observedAt)
