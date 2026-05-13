@@ -1,16 +1,19 @@
 <div class="w-full space-y-4">
   <header class="flex items-start justify-between gap-4">
-    <div class="space-y-1">
-      <h1 class="text-2xl font-bold text-gray-900">Rails Is The Client — latency comparison</h1>
-      <p class="text-sm text-gray-600">
-        Same Binance feed, two paths. Stats are computed entirely in your browser.
-      </p>
-      <p class="text-xs text-amber-700">
-        ⚠️ Latency is captured at different points: <b>Rails</b> records it server-side (inside the job, before the Turbo Stream is broadcast), while <b>JS Direct</b> records it in the browser. When both feeds share the same tab, the browser main thread can be busy rendering rows from <i>both</i> sides, which delays JS Direct's timestamp but not Rails'. That can make Rails look faster than it really is.
-      </p>
-      <p class="text-sm text-gray-500">
-        Binance's <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">stream.binance.com</code> is hosted in Tokyo, so the further you (or the Rails region) are from <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">nrt</code>, the more both paths inherit that round-trip.
-      </p>
+    <div class="flex items-start gap-3">
+      <img src="/icon-512.png" alt="" class="h-28 w-28 shrink-0 rounded-lg" width="112" height="112">
+      <div class="space-y-1">
+        <h1 class="text-2xl font-bold text-gray-900">Rails Is The Client — latency comparison</h1>
+        <p class="text-sm text-gray-600">
+          Same Binance feed, two paths. Stats are computed entirely in your browser.
+        </p>
+        <p class="text-xs text-amber-700">
+          ⚠️ Latency is captured at different points: <b>Rails</b> records it server-side (inside the job, before the Turbo Stream is broadcast), while <b>JS Direct</b> records it in the browser. When both feeds share the same tab, the browser main thread can be busy rendering rows from <i>both</i> sides, which delays JS Direct's timestamp but not Rails'. That can make Rails look faster than it really is.
+        </p>
+        <p class="text-sm text-gray-500">
+          Binance's <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">stream.binance.com</code> is hosted in Tokyo, so the further you (or the Rails region) are from <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">nrt</code>, the more both paths inherit that round-trip.
+        </p>
+      </div>
     </div>
     <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-900 px-3 py-1 text-xs font-mono uppercase tracking-wide text-white">
       region: <%= ENV.fetch("REGION", "local") %>
